@@ -26,7 +26,7 @@ The application processes user inputs, generates optimal meal plans, and manages
      - If Price Swap > Price Recommend --> Point + 0
    - Accumulating Point = 4 (after a month) unlocks random clothing items (shirts, shoes, etc.) for avatar customization.
 
-![System diagram](diagram.png)
+![System diagram](docs/diagram.png)
 
 ## Tech Stack
 
