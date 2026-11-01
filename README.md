@@ -28,6 +28,10 @@ The application processes user inputs, generates optimal meal plans, and manages
 
 ![System diagram](docs/diagram.png)
 
+## Eisenhower Matrix
+
+![Eisenhower Matrix](docs/eisenhower.png)
+
 ## Tech Stack
 
 - **Language:** Python 3.x
