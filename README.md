@@ -30,7 +30,7 @@ The application processes user inputs, generates optimal meal plans, and manages
 
 ## Eisenhower Matrix
 
-![Eisenhower Matrix](docs/eisenhower.png)
+![Eisenhower Matrix](docs/eisenhowermatrix.png)
 
 ## Tech Stack
 
