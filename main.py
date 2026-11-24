@@ -39,7 +39,7 @@ AVATAR_REWARDS = [
     "Data Nerd Glasses",
     "Puffer Vest",
     "Campus Quarter-Zip",
-    "Champion Gold Hoodie"
+    "Champion Gold Hoodie",
 ]
 
 ALLERGEN_ALIASES = {
@@ -197,6 +197,23 @@ def filter_variety(items: list[dict], recent_ids: list[str]) -> list[dict]:
     return filtered if filtered else list(items)
 
 
+def select_items_within_budget(candidates: list[dict], budget: float) -> tuple[list[dict], float]:
+    """Select items whose cumulative price fits within the given budget."""
+    if budget <= 0:
+        return [], 0.0
+
+    selected: list[dict] = []
+    spent = 0.0
+    for item in candidates:
+        price = item["price"]
+        if price < 0:
+            continue
+        if round(spent + price, 2) <= round(budget, 2):
+            selected.append(item)
+            spent = round(spent + price, 2)
+    return selected, spent
+
+
 def load_state(state_path: Path) -> dict:
     """Load persisted user points, unlocked items, and recent week history."""
     if state_path.exists():
@@ -252,6 +269,7 @@ def main() -> None:
     state = load_state(state_path)
 
     weekly_budget = calculate_weekly_budget(args.dollars, args.weeks)
+    budget_for_period = args.dollars if args.weeks == 1 else weekly_budget
     allergy_list = [a.strip() for a in args.allergies.split(",") if a.strip()]
 
     recent_2_weeks_ids = [
@@ -262,17 +280,23 @@ def main() -> None:
     healthy_pool, cheat_day_pool = split_healthy_and_cheat_items(safe_items)
 
     recommended = filter_variety(healthy_pool, recent_2_weeks_ids)
-    top_picks = recommended[:5]
+    top_picks, total_spent = select_items_within_budget(recommended, budget_for_period)
+    remaining_budget = round(budget_for_period - total_spent, 2)
     avg_rec_price = (
-        sum(x["price"] for x in top_picks) / len(top_picks) if top_picks else weekly_budget
+        sum(x["price"] for x in top_picks) / len(top_picks) if top_picks else budget_for_period
     )
 
     print("\n=== DINING DOLLARS HEALTH OPTIMIZER ===")
-    print(f"Dataset:        {csv_path} ({len(menu)} items)")
-    print(f"Dining Dollars: ${args.dollars:.2f} | Remaining Weeks: {args.weeks}")
-    print(f"Weekly Budget:  ${weekly_budget:.2f}")
-    print(f"Allergies:      {', '.join(allergy_list) if allergy_list else 'None'}")
-    print("\n--- Recommended Healthy Items ---")
+    print(f"Dataset:          {csv_path} ({len(menu)} items)")
+    print(f"Dining Dollars:   ${args.dollars:.2f} | Remaining Weeks: {args.weeks}")
+    print(f"Weekly Budget:    ${weekly_budget:.2f}")
+    print(
+        f"Period Budget:    ${budget_for_period:.2f} | Selected Total: ${total_spent:.2f} | Left: ${remaining_budget:.2f}"
+    )
+    print(f"Allergies:        {', '.join(allergy_list) if allergy_list else 'None'}")
+    print(f"\n--- Recommended Healthy Items ({len(top_picks)} items within budget) ---")
+    if not top_picks:
+        print("  No healthy items fit within the current budget.")
     for i, item in enumerate(top_picks, start=1):
         print(f"  {i}. [{item['id']}] {item['name']} - ${item['price']:.2f} (HEALTHY)")
 
