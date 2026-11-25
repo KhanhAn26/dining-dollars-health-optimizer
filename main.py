@@ -17,7 +17,6 @@ AVATAR_REWARDS = [
     "Sunglasses",
     "Sweatshirt",
     "Pants",
-    "Tote Bag",
     "Shoes",
     "Trousers",
 ]
