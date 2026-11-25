@@ -11,7 +11,7 @@ DEFAULT_CSV_PATH = Path(r"C:\Users\Surface\Downloads\Third Street Market Product
 
 AVATAR_REWARDS = [
     "Cap",
-    "Blue Hoodie",
+    "T-Shirt",
     "Jacket",
     "Hoodie",
     "Sunglasses",
