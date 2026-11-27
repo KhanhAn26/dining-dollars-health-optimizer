@@ -130,6 +130,10 @@ py \.app.py
 - [x] Refine and polish the HTML/CSS dashboard layout for an intuitive and clean user results display.
 - [x] Implement the gamified "Cheat Day" item swap and point accumulation tracking system.
 
+## Demo
+
+Link to demo video: https://youtu.be/THMQu6hHiV8
+
 ## Author
 
 Nguyen Khanh An Vu, https://github.com/KhanhAn26
