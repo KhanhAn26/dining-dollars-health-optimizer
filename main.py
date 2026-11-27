@@ -46,7 +46,6 @@ NON_HEALTHY_ITEMS = {
 
 
 def resolve_menu_csv(docs_dir: Path, explicit_csv: str | None) -> Path:
-    """Resolve the dataset CSV path from CLI arg, default Downloads path, or docs/."""
     if explicit_csv:
         custom_path = Path(explicit_csv)
         if not custom_path.exists():
@@ -67,7 +66,6 @@ def resolve_menu_csv(docs_dir: Path, explicit_csv: str | None) -> Path:
 
 
 def pick_column(fieldnames: list[str], candidates: list[str]) -> str | None:
-    """Find a matching column name case-insensitively."""
     lower_map = {name.strip().lower(): name for name in fieldnames}
     for cand in candidates:
         if cand.lower() in lower_map:
@@ -76,7 +74,6 @@ def pick_column(fieldnames: list[str], candidates: list[str]) -> str | None:
 
 
 def expand_allergens(raw_items: list[str]) -> set[str]:
-    """Normalize allergen strings and include common aliases."""
     expanded = set()
     for item in raw_items:
         key = item.strip().lower()
@@ -88,7 +85,6 @@ def expand_allergens(raw_items: list[str]) -> set[str]:
 
 
 def load_menu(csv_path: Path) -> list[dict]:
-    """Load menu items from a CSV file and normalize fields."""
     items = []
     with open(csv_path, mode="r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
@@ -135,7 +131,6 @@ def load_menu(csv_path: Path) -> list[dict]:
 
 
 def calculate_weekly_budget(dollars: float, weeks: int) -> float:
-    """Calculate the average weekly Dining Dollars budget."""
     if weeks <= 0:
         raise ValueError("--weeks must be greater than 0.")
     if dollars <= 0:
@@ -144,7 +139,6 @@ def calculate_weekly_budget(dollars: float, weeks: int) -> float:
 
 
 def filter_allergens(items: list[dict], allergies: list[str]) -> list[dict]:
-    """Exclude menu items that contain any of the user's allergens."""
     blocked = expand_allergens(allergies)
     if not blocked:
         return list(items)
@@ -152,7 +146,6 @@ def filter_allergens(items: list[dict], allergies: list[str]) -> list[dict]:
 
 
 def classify_health(item: dict) -> dict:
-    """Classify an item as healthy or non-healthy (Cheat Day candidate)."""
     name_lower = item["name"].strip().lower()
     is_healthy = name_lower not in NON_HEALTHY_ITEMS
 
@@ -162,7 +155,6 @@ def classify_health(item: dict) -> dict:
 
 
 def split_healthy_and_cheat_items(items: list[dict]) -> tuple[list[dict], list[dict]]:
-    """Split safe items into Healthy recommendations and Non-Healthy Cheat Day options."""
     tagged = [classify_health(x) for x in items]
     healthy_items = [x for x in tagged if x["is_healthy"]]
     cheat_day_items = [x for x in tagged if not x["is_healthy"]]
@@ -170,14 +162,12 @@ def split_healthy_and_cheat_items(items: list[dict]) -> tuple[list[dict], list[d
 
 
 def filter_variety(items: list[dict], recent_ids: list[str]) -> list[dict]:
-    """Avoid repeating items from recent history (up to 2 weeks)."""
     recent_set = set(recent_ids)
     filtered = [item for item in items if item["id"] not in recent_set]
     return filtered if filtered else list(items)
 
 
 def select_items_within_budget(candidates: list[dict], budget: float) -> tuple[list[dict], float]:
-    """Select items whose cumulative price fits within the given budget."""
     if budget <= 0:
         return [], 0.0
 
@@ -194,7 +184,6 @@ def select_items_within_budget(candidates: list[dict], budget: float) -> tuple[l
 
 
 def load_state(state_path: Path) -> dict:
-    """Load persisted user points, unlocked items, and recent week history."""
     if state_path.exists():
         with open(state_path, mode="r", encoding="utf-8") as f:
             return json.load(f)
@@ -206,14 +195,12 @@ def load_state(state_path: Path) -> dict:
 
 
 def save_state(state_path: Path, state: dict) -> None:
-    """Save updated application state to disk."""
     state_path.parent.mkdir(parents=True, exist_ok=True)
     with open(state_path, mode="w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, ensure_ascii=False)
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Dining Dollars Health Optimizer")
     parser.add_argument("--dollars", type=float, required=True, help="Current Dining Dollars")
     parser.add_argument("--weeks", type=int, required=True, help="Remaining weeks in semester")
@@ -282,29 +269,31 @@ def main() -> None:
     current_week_ids = [x["id"] for x in top_picks]
     state["recent_weeks_ids"] = (state["recent_weeks_ids"] + [current_week_ids])[-2:]
 
-    chosen_healthy = None
-    reference_price = avg_rec_price
-
-    if not args.no_prompt and top_picks:
-        print("\n--- Pick Healthy Item to Swap Out ---")
-        for idx, item in enumerate(top_picks, start=1):
-            print(f"  {idx}. {item['name']} (${item['price']:.2f})")
-        raw_healthy_pick = input(
-            f"Pick healthy item number to swap (or Enter to use avg ${avg_rec_price:.2f}): "
-        ).strip()
-        if raw_healthy_pick.isdigit():
-            h_idx = int(raw_healthy_pick) - 1
-            if 0 <= h_idx < len(top_picks):
-                chosen_healthy = top_picks[h_idx]
-                reference_price = chosen_healthy["price"]
-                print(f"Selected healthy item to swap: {chosen_healthy['name']} (${reference_price:.2f})")
-
     if not args.no_prompt:
         if not cheat_day_pool:
             print("\nNo allergy-safe Cheat Day items available for your current allergy filter.")
         else:
             choice = input("\nUse Cheat Day swap this week? (y/n): ").strip().lower()
-            if choice == "y":
+            if choice in {"y", "yes"}:
+                chosen_healthy = None
+                reference_price = avg_rec_price
+
+                if top_picks:
+                    print("\n--- Pick Healthy Item to Swap Out ---")
+                    for idx, item in enumerate(top_picks, start=1):
+                        print(f"  {idx}. {item['name']} (${item['price']:.2f})")
+                    raw_healthy_pick = input(
+                        f"Pick healthy item number to swap (or Enter to use avg ${avg_rec_price:.2f}): "
+                    ).strip()
+                    if raw_healthy_pick.isdigit():
+                        h_idx = int(raw_healthy_pick) - 1
+                        if 0 <= h_idx < len(top_picks):
+                            chosen_healthy = top_picks[h_idx]
+                            reference_price = chosen_healthy["price"]
+                            print(
+                                f"Selected healthy item to swap: {chosen_healthy['name']} (${reference_price:.2f})"
+                            )
+
                 print("\n--- Cheat Day List (Non-Healthy Treats) ---")
                 for idx, item in enumerate(cheat_day_pool, start=1):
                     print(f"  {idx}. {item['name']} (${item['price']:.2f})")
@@ -328,7 +317,9 @@ def main() -> None:
                             top_picks = [x for x in top_picks if x["id"] != chosen_healthy["id"]]
                             total_spent = round(sum(x["price"] for x in top_picks), 2)
                             remaining_budget = round(budget_for_period - total_spent, 2)
-                            print(f"Swapped out healthy item: {chosen_healthy['name']} (${chosen_healthy['price']:.2f})")
+                            print(
+                                f"Swapped out healthy item: {chosen_healthy['name']} (${chosen_healthy['price']:.2f})"
+                            )
 
                         if state["points"] >= 4:
                             reward = random.choice(AVATAR_REWARDS)
