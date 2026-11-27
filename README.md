@@ -119,6 +119,7 @@ Swap accepted: Yakisoba ($3.49 <= $6.29). +1 Point!
 Swapped out healthy item: Veggies & ranch ($6.29)
 
 Current Points: 1 | Unlocked Avatar Items: []
+
 2. Run the Web app
 ```bash
 py \.app.py
