@@ -282,6 +282,23 @@ def main() -> None:
     current_week_ids = [x["id"] for x in top_picks]
     state["recent_weeks_ids"] = (state["recent_weeks_ids"] + [current_week_ids])[-2:]
 
+    chosen_healthy = None
+    reference_price = avg_rec_price
+
+    if not args.no_prompt and top_picks:
+        print("\n--- Pick Healthy Item to Swap Out ---")
+        for idx, item in enumerate(top_picks, start=1):
+            print(f"  {idx}. {item['name']} (${item['price']:.2f})")
+        raw_healthy_pick = input(
+            f"Pick healthy item number to swap (or Enter to use avg ${avg_rec_price:.2f}): "
+        ).strip()
+        if raw_healthy_pick.isdigit():
+            h_idx = int(raw_healthy_pick) - 1
+            if 0 <= h_idx < len(top_picks):
+                chosen_healthy = top_picks[h_idx]
+                reference_price = chosen_healthy["price"]
+                print(f"Selected healthy item to swap: {chosen_healthy['name']} (${reference_price:.2f})")
+
     if not args.no_prompt:
         if not cheat_day_pool:
             print("\nNo allergy-safe Cheat Day items available for your current allergy filter.")
@@ -297,15 +314,21 @@ def main() -> None:
                     pick_idx = int(raw_pick) - 1
                     if 0 <= pick_idx < len(cheat_day_pool):
                         swap_item = cheat_day_pool[pick_idx]
-                        if swap_item["price"] <= avg_rec_price:
+                        if swap_item["price"] <= reference_price:
                             state["points"] += 1
                             print(
-                                f"Swap accepted: {swap_item['name']} (${swap_item['price']:.2f} <= ${avg_rec_price:.2f}). +1 Point!"
+                                f"Swap accepted: {swap_item['name']} (${swap_item['price']:.2f} <= ${reference_price:.2f}). +1 Point!"
                             )
                         else:
                             print(
-                                f"Swap accepted: {swap_item['name']} (${swap_item['price']:.2f} > ${avg_rec_price:.2f}). +0 Point."
+                                f"Swap accepted: {swap_item['name']} (${swap_item['price']:.2f} > ${reference_price:.2f}). +0 Point."
                             )
+
+                        if chosen_healthy is not None:
+                            top_picks = [x for x in top_picks if x["id"] != chosen_healthy["id"]]
+                            total_spent = round(sum(x["price"] for x in top_picks), 2)
+                            remaining_budget = round(budget_for_period - total_spent, 2)
+                            print(f"Swapped out healthy item: {chosen_healthy['name']} (${chosen_healthy['price']:.2f})")
 
                         if state["points"] >= 4:
                             reward = random.choice(AVATAR_REWARDS)

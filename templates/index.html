@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dining Dollars Health Optimizer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body
+  data-swap-price="{{ (result.swap_item.price if result and result.swap_item else 5.0) | tojson }}"
+  data-period-budget="{{ (result.budget_for_period if result else 0.0) | tojson }}"
+  data-base-spent="{{ (result.total_spent if result else 0.0) | tojson }}"
+>
+  <header class="top-banner">
+    <div class="banner-inner">
+      <div class="banner-title">
+        <h1>Dining Dollars Health Optimizer</h1>
+        <p>West Lafayette Live Clock &amp; Healthy / Cheat Meal Tracker</p>
+      </div>
+
+      <div class="fb-avatar-wrap">
+        <button type="button" id="fbAvatarBtn" class="fb-avatar-btn" title="Account &amp; Profile">
+          <svg viewBox="0 0 64 64" class="fb-default-svg" aria-hidden="true">
+            <circle cx="32" cy="32" r="32" fill="#e4e6eb" />
+            <circle cx="32" cy="24" r="11" fill="#bcc0c4" />
+            <path d="M12 56c2.5-10.5 10.5-17 20-17s17.5 6.5 20 17" fill="#bcc0c4" />
+          </svg>
+        </button>
+
+        <div id="avatarPopover" class="avatar-popover hidden">
+          <div id="openProfileCardBtn" class="profile-trigger-card">
+            <div class="mini-avatar">👤</div>
+            <div>
+              <strong>My Profile</strong>
+              <div class="sub-text">Open Avatar &amp; Wheel</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="side-card left-calendar">
+      <h2>West Lafayette Schedule</h2>
+      <div id="wlClock" class="wl-clock">--:--:--</div>
+      <div id="wlDateFull" class="wl-date-full">Loading...</div>
+      <div id="weekCalendar" class="week-list"></div>
+    </aside>
+
+    <main class="center-main">
+      <form method="POST" class="card">
+        <div>
+          <label for="dollars">Dining Dollars ($)</label>
+          <input id="dollars" type="number" step="0.01" min="0" name="dollars" value="{{ dollars }}" required />
+        </div>
+
+        <div>
+          <label for="weeks">Remaining Weeks</label>
+          <input id="weeks" type="number" min="1" name="weeks" value="{{ weeks }}" required />
+        </div>
+
+        <div>
+          <label for="allergies">Allergies (comma-separated)</label>
+          <input id="allergies" type="text" name="allergies" placeholder="e.g. dairy, peanuts" value="{{ allergies }}" />
+        </div>
+
+        <div class="cheat-toggle">
+          <input id="wantCheatToggle" type="checkbox" name="want_cheat" value="1" />
+          <label for="wantCheatToggle">Want a cheat meal?</label>
+        </div>
+
+        <div id="cheatBox" class="cheat-box hidden">
+          <div class="swap-info">
+            <span>Swap reference budget:</span>
+            <strong id="swapItemLabel">
+              {% if result and result.swap_item %}
+                {{ result.swap_item.name }} (${{ "%.2f"|format(result.swap_item.price) }})
+              {% else %}
+                Healthy Meal ($5.00)
+              {% endif %}
+            </strong>
+          </div>
+
+          <div class="swap-select-block">
+            <div class="sub-text">Choose healthy item to swap out:</div>
+            <div id="swapCheckboxList" class="cheat-list">
+              {% if result and result.selected_items %}
+                {% for h_item in result.selected_items %}
+                  <label class="cheat-row">
+                    <span class="cheat-left">
+                      <input
+                        type="checkbox"
+                        class="swap-item-cb"
+                        data-name="{{ h_item.name }}"
+                        data-price="{{ h_item.price }}"
+                      />
+                      <span>{{ h_item.name }}</span>
+                    </span>
+                    <span class="cheat-price">${{ "%.2f"|format(h_item.price) }}</span>
+                  </label>
+                {% endfor %}
+              {% else %}
+                <p class="sub-text">Generate a healthy list first to pick items to swap.</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="sub-text">Choose 1 cheat meal:</div>
+          <div id="cheatCheckboxList" class="cheat-list">
+            {% if result and result.cheat_pool %}
+              {% for item in result.cheat_pool %}
+                <label class="cheat-row">
+                  <span class="cheat-left">
+                    <input
+                      type="checkbox"
+                      class="cheat-item-cb"
+                      data-name="{{ item.name }}"
+                      data-price="{{ item.price }}"
+                    />
+                    <span>{{ item.name }}</span>
+                  </span>
+                  <span class="cheat-price">${{ "%.2f"|format(item.price) }}</span>
+                </label>
+              {% endfor %}
+            {% else %}
+              <label class="cheat-row">
+                <span class="cheat-left">
+                  <input type="checkbox" class="cheat-item-cb" data-name="Loaded Fries" data-price="3.50" />
+                  <span>Loaded Fries</span>
+                </span>
+                <span class="cheat-price">$3.50</span>
+              </label>
+              <label class="cheat-row">
+                <span class="cheat-left">
+                  <input type="checkbox" class="cheat-item-cb" data-name="Double Cheeseburger" data-price="8.99" />
+                  <span>Double Cheeseburger</span>
+                </span>
+                <span class="cheat-price">$8.99</span>
+              </label>
+              <label class="cheat-row">
+                <span class="cheat-left">
+                  <input type="checkbox" class="cheat-item-cb" data-name="Chocolate Sundae" data-price="4.25" />
+                  <span>Chocolate Sundae</span>
+                </span>
+                <span class="cheat-price">$4.25</span>
+              </label>
+            {% endif %}
+          </div>
+
+          <button type="button" id="applyCheatBtn" class="secondary-btn">
+            Confirm cheat item &amp; check swap price
+          </button>
+          <div id="cheatFeedback" class="cheat-feedback"></div>
+        </div>
+
+        <button type="submit" class="primary-btn">Generate Healthy List</button>
+      </form>
+
+      {% if error %}
+        <div class="card error-box"><strong>Error:</strong> {{ error }}</div>
+      {% endif %}
+
+      <section id="selectedCheatSection" class="card">
+        <h2>Selected Cheat Meals</h2>
+        <ul id="selectedCheatList" class="item-ul">
+          <li>No cheat meal selected yet.</li>
+        </ul>
+      </section>
+
+      {% if result %}
+        <section class="card">
+          <h2>Budget Summary</h2>
+          <p id="budgetSummaryText">
+            <strong>Period Budget:</strong> $<span id="summaryPeriodBudget">{{ "%.2f"|format(result.budget_for_period) }}</span> |
+            <strong>Selected Total:</strong> $<span id="summarySelectedTotal">{{ "%.2f"|format(result.total_spent) }}</span> |
+            <strong>Left:</strong> $<span id="summaryRemainingBudget">{{ "%.2f"|format(result.remaining_budget) }}</span>
+          </p>
+
+          <h2>Recommended Healthy Items ({{ result.selected_items|length }})</h2>
+          {% if result.selected_items %}
+            <ul id="recommendedHealthyUl" class="item-ul">
+              {% for item in result.selected_items %}
+                <li data-healthy-name="{{ item.name }}">{{ item.name }} - ${{ "%.2f"|format(item.price) }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>No healthy items fit within the current budget.</p>
+          {% endif %}
+        </section>
+      {% endif %}
+    </main>
+
+    <aside class="side-card right-score">
+      <h2>Current Points</h2>
+      <div id="mainPointValue" class="big-point">0</div>
+      <p class="sub-text">Choose item &lt;= price of swap item to earn 1 point</p>
+      <button type="button" id="resetDemoBtn" class="ghost-btn">Reset points &amp; schedule</button>
+    </aside>
+  </div>
+
+  <div id="choiceConfirmModal" class="modal-backdrop hidden" style="z-index: 9999;">
+    <div class="modal-window" style="max-width: 420px; text-align: center;">
+      <h3 id="choiceConfirmTitle">Confirm Selection</h3>
+      <p id="choiceConfirmMessage" style="margin: 14px 0 22px; font-size: 16px;">
+        Do you want to choose this item?
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button type="button" id="choiceConfirmYesBtn" class="primary-btn" style="min-width: 110px;">Yes</button>
+        <button type="button" id="choiceConfirmNoBtn" class="secondary-btn" style="min-width: 110px;">No</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="profileModal" class="modal-backdrop hidden">
+    <div class="modal-window" style="position: relative; overflow: hidden;">
+      <canvas
+        id="fireworksCanvas"
+        width="760"
+        height="520"
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20;"
+      ></canvas>
+      <button type="button" id="closeModalBtn" class="close-modal-btn" style="position: relative; z-index: 30;">✕</button>
+
+      <div class="profile-grid" style="position: relative; z-index: 10;">
+        <div class="character-stage-wrap">
+          <div id="characterStage" class="character-stage">
+            <img
+              id="baseCharacterImg"
+              src=""
+              alt="Base Character"
+              class="character-layer base-layer"
+              style="display: none;"
+            />
+            <svg id="fallbackCharacterSvg" viewBox="0 0 240 420" class="character-layer fallback-svg">
+              <circle cx="120" cy="68" r="32" fill="#f1c29b" stroke="#334155" stroke-width="2" />
+              <rect x="108" y="98" width="24" height="24" rx="8" fill="#e5b38a" />
+              <path d="M74 128 Q120 118 166 128 L156 238 L84 238 Z" fill="#f1c29b" stroke="#334155" stroke-width="2" />
+              <path d="M74 132 L42 222 L60 228 L86 154 Z" fill="#f1c29b" stroke="#334155" stroke-width="2" />
+              <path d="M166 132 L198 222 L180 228 L154 154 Z" fill="#f1c29b" stroke="#334155" stroke-width="2" />
+              <path d="M86 238 L78 386 L104 386 L116 250 Z" fill="#f1c29b" stroke="#334155" stroke-width="2" />
+              <path d="M154 238 L162 386 L136 386 L124 250 Z" fill="#f1c29b" stroke="#334155" stroke-width="2" />
+            </svg>
+
+            <img id="equippedCapImg" src="" alt="Cap" class="equip-layer equip-hat hidden" />
+            <img id="equippedTopImg" src="" alt="Top" class="equip-layer equip-top hidden" />
+            <img id="equippedBottomImg" src="" alt="Bottom" class="equip-layer equip-bottom hidden" />
+            <img id="equippedShoesImg" src="" alt="Shoes" class="equip-layer equip-shoes hidden" />
+          </div>
+          <div id="equippedSummary" class="equipped-summary">Is wearing: Item not chosen.</div>
+        </div>
+
+        <div class="profile-right-col">
+          <div class="profile-top-panel">
+            <div class="point-header-row">
+              <span>POINT</span>
+              <strong id="modalPointValue">0</strong>
+            </div>
+
+            <div id="wheelSection" class="wheel-section hidden">
+              <div class="wheel-pointer">▼</div>
+              <canvas id="wheelCanvas" width="210" height="210"></canvas>
+              <button type="button" id="spinWheelBtn" class="wheel-btn">Random Wheel</button>
+              <div id="wheelResultText" class="wheel-result"></div>
+            </div>
+            <div id="wheelLockedNote" class="sub-text">
+              Reach <strong>4 points</strong> to unlock Random Wheel for items.
+            </div>
+          </div>
+
+          <div class="profile-items-panel">
+            <h3>Items</h3>
+            <div id="itemsSlotGrid" class="items-grid">
+              <div class="item-card" data-slot="cap" data-label="Item 1 (Cap)" data-img="/static/360_F_327382858_chTKyqFvPB4U0c1zi0OjYHT7dqp8zieR.jpg">
+                <img src="/static/360_F_327382858_chTKyqFvPB4U0c1zi0OjYHT7dqp8zieR.jpg" alt="Item 1 (Cap)" class="item-thumb" />
+                <span class="item-name">Item 1 (Cap)</span>
+              </div>
+
+              <div class="item-card" data-slot="top" data-label="Item 2 (Top)" data-img="/static/cartoon-clothes-male-blue-t-shirt-vector.jpg">
+                <img src="/static/cartoon-clothes-male-blue-t-shirt-vector.jpg" alt="Item 2 (Top)" class="item-thumb" />
+                <span class="item-name">Item 2 (Top)</span>
+              </div>
+
+              <div class="item-card" data-slot="top" data-label="Item 3 (Top)" data-img="/static/istockphoto-1175518110-612x612.jpg">
+                <img src="/static/istockphoto-1175518110-612x612.jpg" alt="Item 3 (Top)" class="item-thumb" />
+                <span class="item-name">Item 3 (Top)</span>
+              </div>
+
+              <div class="item-card" data-slot="top" data-label="Item 4 (Top)" data-img="/static/striped-orange-sweater-cartoon-isolated-illustration-on-white-background-vector.jpg">
+                <img src="/static/striped-orange-sweater-cartoon-isolated-illustration-on-white-background-vector.jpg" alt="Item 4 (Top)" class="item-thumb" />
+                <span class="item-name">Item 4 (Top)</span>
+              </div>
+
+              <div class="item-card" data-slot="top" data-label="Item 5 (Top)" data-img="/static/istockphoto-1425070558-612x612.jpg">
+                <img src="/static/istockphoto-1425070558-612x612.jpg" alt="Item 5 (Top)" class="item-thumb" />
+                <span class="item-name">Item 5 (Top)</span>
+              </div>
+
+              <div class="item-card" data-slot="bottom" data-label="Item 6 (Bottom)" data-img="/static/istockphoto-1076492576-612x612.jpg">
+                <img src="/static/istockphoto-1076492576-612x612.jpg" alt="Item 6 (Bottom)" class="item-thumb" />
+                <span class="item-name">Item 6 (Bottom)</span>
+              </div>
+
+              <div class="item-card" data-slot="bottom" data-label="Item 7 (Bottom)" data-img="/static/vector-single-cartoon-illustration-green-jogger-trousers-white-background-124274375.webp">
+                <img src="/static/vector-single-cartoon-illustration-green-jogger-trousers-white-background-124274375.webp" alt="Item 7 (Bottom)" class="item-thumb" />
+                <span class="item-name">Item 7 (Bottom)</span>
+              </div>
+
+              <div class="item-card" data-slot="shoes" data-label="Item 8 (Shoes)" data-img="/static/vector-cartoon-yellow-sneakers-smart-260nw-2285618295.webp">
+                <img src="/static/vector-cartoon-yellow-sneakers-smart-260nw-2285618295.webp" alt="Item 8 (Shoes)" class="item-thumb" />
+                <span class="item-name">Item 8 (Shoes)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "dd_health_optimizer_state_v1";
+    const UNLOCK_POINTS = 4;
+    const defaultSwapPrice = Number(document.body.dataset.swapPrice) || 5.0;
+    const periodBudget = Number(document.body.dataset.periodBudget) || 0.0;
+    const baseSpent = Number(document.body.dataset.baseSpent) || 0.0;
+
+    const defaultState = {
+      points: 0,
+      cheatDays: [],
+      selectedCheats: [],
+      swappedHealthy: [],
+      cheatLocked: false,
+      swapLocked: false,
+      wheelSpunThisCycle: false,
+      clothesDisabledAfterSpin: false,
+      equipped: {
+        cap: "",
+        top: "",
+        bottom: "",
+        shoes: "",
+      },
+    };
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(defaultState);
+        const parsed = JSON.parse(raw);
+        return {
+          ...structuredClone(defaultState),
+          ...parsed,
+          equipped: { ...structuredClone(defaultState.equipped), ...(parsed.equipped || {}) },
+        };
+      } catch {
+        return structuredClone(defaultState);
+      }
+    }
+
+    let appState = loadState();
+
+    let pendingChoice = null;
+    let blockingChoicePrompt = false;
+
+    const choiceConfirmModal = document.getElementById("choiceConfirmModal");
+    const choiceConfirmTitle = document.getElementById("choiceConfirmTitle");
+    const choiceConfirmMessage = document.getElementById("choiceConfirmMessage");
+    const choiceConfirmYesBtn = document.getElementById("choiceConfirmYesBtn");
+    const choiceConfirmNoBtn = document.getElementById("choiceConfirmNoBtn");
+
+    function openChoiceConfirmModal(type, cb) {
+      pendingChoice = { type, cb };
+      blockingChoicePrompt = true;
+      const name = cb.dataset.name;
+      const price = parseFloat(cb.dataset.price || "0").toFixed(2);
+      choiceConfirmTitle.textContent = type === "swap" ? "Confirm Healthy Meal Swap" : "Confirm Cheat Meal";
+      choiceConfirmMessage.textContent =
+        type === "swap"
+          ? `Swap out healthy meal "${name}" ($${price})? Yes or No?`
+          : `Choose cheat meal "${name}" ($${price})? Yes or No?`;
+      choiceConfirmModal.classList.remove("hidden");
+    }
+
+    function closeChoiceConfirmModal() {
+      blockingChoicePrompt = false;
+      pendingChoice = null;
+      choiceConfirmModal.classList.add("hidden");
+    }
+
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        if (blockingChoicePrompt && e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true
+    );
+
+    choiceConfirmYesBtn.addEventListener("click", () => {
+      if (!pendingChoice) return;
+      const { type, cb } = pendingChoice;
+
+      if (type === "swap") {
+        document.querySelectorAll(".swap-item-cb").forEach((box) => {
+          if (box !== cb) box.checked = false;
+        });
+        cb.checked = true;
+        appState.swapLocked = true;
+        updateSwapLabelAndSummary();
+      } else {
+        document.querySelectorAll(".cheat-item-cb").forEach((box) => {
+          if (box !== cb) box.checked = false;
+        });
+        cb.checked = true;
+        appState.cheatLocked = true;
+      }
+
+      closeChoiceConfirmModal();
+      saveState();
+    });
+
+    choiceConfirmNoBtn.addEventListener("click", () => {
+      if (!pendingChoice) return;
+      const { type, cb } = pendingChoice;
+      cb.checked = false;
+      if (type === "swap") {
+        appState.swapLocked = false;
+        updateSwapLabelAndSummary();
+      }
+      closeChoiceConfirmModal();
+      saveState();
+    });
+
+    function syncCheatCheckboxLock() {
+      const boxes = [...document.querySelectorAll(".cheat-item-cb")];
+      if (!appState.cheatLocked) {
+        boxes.forEach((box) => {
+          box.disabled = false;
+          if (box.closest("label")) box.closest("label").style.opacity = "1";
+        });
+        return;
+      }
+      boxes.forEach((box) => {
+        if (!box.checked) {
+          box.disabled = true;
+          if (box.closest("label")) box.closest("label").style.opacity = "0.5";
+        } else {
+          box.disabled = true;
+          if (box.closest("label")) box.closest("label").style.opacity = "1";
+        }
+      });
+    }
+
+    function syncSwapCheckboxLock() {
+      const boxes = [...document.querySelectorAll(".swap-item-cb")];
+      if (!appState.swapLocked) {
+        boxes.forEach((box) => {
+          box.disabled = false;
+          if (box.closest("label")) box.closest("label").style.opacity = "1";
+        });
+        return;
+      }
+      boxes.forEach((box) => {
+        box.disabled = true;
+        if (box.closest("label")) {
+          box.closest("label").style.opacity = box.checked ? "1" : "0.5";
+        }
+      });
+    }
+
+    document.querySelectorAll(".cheat-item-cb").forEach((cb) => {
+      cb.addEventListener("change", (e) => {
+        if (appState.cheatLocked) {
+          e.preventDefault();
+          cb.checked = false;
+          return;
+        }
+        if (cb.checked) {
+          openChoiceConfirmModal("cheat", cb);
+        }
+      });
+    });
+
+    document.querySelectorAll(".swap-item-cb").forEach((cb) => {
+      cb.addEventListener("change", (e) => {
+        if (appState.swapLocked) {
+          e.preventDefault();
+          cb.checked = false;
+          return;
+        }
+        if (cb.checked) {
+          openChoiceConfirmModal("swap", cb);
+        } else {
+          updateSwapLabelAndSummary();
+        }
+      });
+    });
+
+    function getCheckedSwapItems() {
+      return [...document.querySelectorAll(".swap-item-cb:checked")].map((cb) => ({
+        name: cb.dataset.name,
+        price: parseFloat(cb.dataset.price || "0"),
+      }));
+    }
+
+    function getActiveSwapReferencePrice() {
+      const checkedSwaps = getCheckedSwapItems();
+      if (checkedSwaps.length > 0) {
+        return checkedSwaps.reduce((acc, x) => acc + x.price, 0);
+      }
+      return defaultSwapPrice;
+    }
+
+    function updateSwapLabelAndSummary() {
+      const labelEl = document.getElementById("swapItemLabel");
+      const checkedSwaps = getCheckedSwapItems();
+      const refPrice = getActiveSwapReferencePrice();
+
+      if (labelEl) {
+        if (checkedSwaps.length > 0) {
+          const names = checkedSwaps.map((x) => x.name).join(", ");
+          labelEl.textContent = `${names} ($${refPrice.toFixed(2)})`;
+        } else {
+          labelEl.textContent = `Default Item ($${refPrice.toFixed(2)})`;
+        }
+      }
+
+      const spentEl = document.getElementById("summarySelectedTotal");
+      const leftEl = document.getElementById("summaryRemainingBudget");
+      if (spentEl && leftEl) {
+        const swappedOutSum = (appState.swappedHealthy || []).reduce((acc, x) => acc + Number(x.price || 0), 0);
+        const validCheatSum = (appState.selectedCheats || [])
+          .filter((x) => x.valid)
+          .reduce((acc, x) => acc + Number(x.price || 0), 0);
+
+        const updatedSpent = Math.max(0, baseSpent - swappedOutSum + validCheatSum);
+        const updatedLeft = periodBudget - updatedSpent;
+        spentEl.textContent = updatedSpent.toFixed(2);
+        leftEl.textContent = updatedLeft.toFixed(2);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      renderPointsAndWheel();
+      renderWeekCalendar();
+      renderSelectedCheatList();
+      renderEquippedClothes();
+      renderItemLocks();
+      renderRecommendedHealthyList();
+      updateSwapLabelAndSummary();
+      syncCheatCheckboxLock();
+      syncSwapCheckboxLock();
+    }
+
+    function getWestLafayetteNow() {
+      return new Date(
+        new Date().toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" })
+      );
+    }
+
+    function formatYMD(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const d = String(dateObj.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function updateWestLafayetteClock() {
+      const now = getWestLafayetteNow();
+      const timeStr = now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+        timeZone: "America/Indiana/Indianapolis",
+      });
+      const dateStr = now.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "America/Indiana/Indianapolis",
+      });
+      document.getElementById("wlClock").textContent = timeStr;
+      document.getElementById("wlDateFull").textContent = dateStr;
+    }
+
+    function renderWeekCalendar() {
+      const container = document.getElementById("weekCalendar");
+      if (!container) return;
+      const now = getWestLafayetteNow();
+      const todayYmd = formatYMD(now);
+      const dayOfWeek = now.getDay();
+      const sunday = new Date(now);
+      sunday.setDate(now.getDate() - dayOfWeek);
+
+      const cheatSet = new Set(appState.cheatDays || []);
+      container.innerHTML = "";
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(sunday);
+        d.setDate(sunday.getDate() + i);
+        const ymd = formatYMD(d);
+        const hasCheat = cheatSet.has(ymd);
+
+        const row = document.createElement("div");
+        row.className = `cal-day ${hasCheat ? "has-cheat" : ""} ${ymd === todayYmd ? "is-today" : ""}`;
+
+        const label = d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
+        row.innerHTML = `
+          <span>${label}</span>
+          ${hasCheat ? '<span class="cheat-badge">CHEAT MEAL</span>' : '<span class="cal-dot"></span>'}
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    function renderSelectedCheatList() {
+      const ul = document.getElementById("selectedCheatList");
+      if (!ul) return;
+      ul.innerHTML = "";
+      const list = appState.selectedCheats || [];
+      if (list.length === 0) {
+        ul.innerHTML = "<li>No cheat meal selected yet.</li>";
+        return;
+      }
+      list.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = `${item.name} - $${Number(item.price).toFixed(2)}`;
+        ul.appendChild(li);
+      });
+    }
+
+    function renderRecommendedHealthyList() {
+      const ul = document.getElementById("recommendedHealthyUl");
+      if (!ul) return;
+
+      const swappedNames = new Set((appState.swappedHealthy || []).map((x) => x.name));
+      const lis = [...ul.querySelectorAll("li[data-healthy-name]")];
+
+      let visibleCount = 0;
+      lis.forEach((li) => {
+        const itemName = li.dataset.healthyName;
+        if (swappedNames.has(itemName)) {
+          li.style.display = "none";
+        } else {
+          li.style.display = "";
+          visibleCount += 1;
+        }
+      });
+
+      const heading = ul.previousElementSibling;
+      if (heading && heading.tagName === "H2") {
+        heading.textContent = `Recommended Healthy Items (${visibleCount})`;
+      }
+    }
+
+    function renderItemLocks() {
+      const unlocked = appState.points >= UNLOCK_POINTS && !appState.clothesDisabledAfterSpin;
+      document.querySelectorAll(".item-card").forEach((card) => {
+        card.classList.toggle("item-locked", !unlocked);
+        card.setAttribute("aria-disabled", String(!unlocked));
+      });
+    }
+
+    const wantCheatToggle = document.getElementById("wantCheatToggle");
+    const cheatBox = document.getElementById("cheatBox");
+    wantCheatToggle.addEventListener("change", () => {
+      cheatBox.classList.toggle("hidden", !wantCheatToggle.checked);
+    });
+
+    const applyCheatBtn = document.getElementById("applyCheatBtn");
+    const cheatFeedback = document.getElementById("cheatFeedback");
+
+    applyCheatBtn.addEventListener("click", () => {
+      const checkedBoxes = [...document.querySelectorAll(".cheat-item-cb:checked")];
+      if (checkedBoxes.length === 0) {
+        cheatFeedback.textContent = "Choose 1 cheat meal.";
+        cheatFeedback.className = "cheat-feedback bad";
+        return;
+      }
+
+      const refSwapPrice = getActiveSwapReferencePrice();
+      const checkedSwaps = getCheckedSwapItems();
+
+      const todayYmd = formatYMD(getWestLafayetteNow());
+      if (!appState.cheatDays.includes(todayYmd)) {
+        appState.cheatDays.push(todayYmd);
+      }
+
+      let earned = 0;
+      const chosenItems = [];
+      const details = checkedBoxes.map((cb) => {
+        const name = cb.dataset.name;
+        const price = parseFloat(cb.dataset.price || "0");
+        const ok = price <= refSwapPrice;
+        if (ok) earned += 1;
+        chosenItems.push({ name, price, valid: ok });
+        return `${name} ($${price.toFixed(2)}) ${ok ? "✓ +1pt" : "✗ > swap"}`;
+      });
+
+      appState.swappedHealthy = earned > 0 ? checkedSwaps : [];
+      appState.selectedCheats = chosenItems;
+      appState.points += earned;
+      if (appState.points < UNLOCK_POINTS) {
+        appState.wheelSpunThisCycle = false;
+        appState.clothesDisabledAfterSpin = false;
+      }
+      cheatFeedback.innerHTML = details.join("<br>");
+      cheatFeedback.className = `cheat-feedback ${earned > 0 ? "ok" : "bad"}`;
+      saveState();
+    });
+
+    const fbAvatarBtn = document.getElementById("fbAvatarBtn");
+    const avatarPopover = document.getElementById("avatarPopover");
+    const openProfileCardBtn = document.getElementById("openProfileCardBtn");
+    const profileModal = document.getElementById("profileModal");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+
+    fbAvatarBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      avatarPopover.classList.toggle("hidden");
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!avatarPopover.contains(e.target) && e.target !== fbAvatarBtn) {
+        avatarPopover.classList.add("hidden");
+      }
+    });
+
+    openProfileCardBtn.addEventListener("click", () => {
+      avatarPopover.classList.add("hidden");
+      profileModal.classList.remove("hidden");
+      renderPointsAndWheel();
+      renderEquippedClothes();
+      renderItemLocks();
+    });
+
+    closeModalBtn.addEventListener("click", () => {
+      profileModal.classList.add("hidden");
+    });
+
+    const fwCanvas = document.getElementById("fireworksCanvas");
+    const fwCtx = fwCanvas ? fwCanvas.getContext("2d") : null;
+    let particles = [];
+    let fwAnimId = null;
+
+    function launchFireworks() {
+      if (!fwCanvas || !fwCtx) return;
+      fwCanvas.width = fwCanvas.parentElement.clientWidth || 760;
+      fwCanvas.height = fwCanvas.parentElement.clientHeight || 520;
+      const colors = ["#ff4d4f", "#ffbe0b", "#3a86ff", "#06d6a0", "#ff006e", "#a855f7"];
+
+      for (let burst = 0; burst < 4; burst++) {
+        const bx = fwCanvas.width * (0.2 + Math.random() * 0.6);
+        const by = fwCanvas.height * (0.2 + Math.random() * 0.45);
+        for (let i = 0; i < 28; i++) {
+          const angle = (Math.PI * 2 * i) / 28 + Math.random() * 0.2;
+          const speed = 2 + Math.random() * 4.5;
+          particles.push({
+            x: bx,
+            y: by,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            alpha: 1,
+            color: colors[(burst + i) % colors.length],
+            radius: 2.5 + Math.random() * 2.5,
+          });
+        }
+      }
+
+      if (!fwAnimId) {
+        animateFireworks();
+      }
+    }
+
+    function animateFireworks() {
+      if (!fwCanvas || !fwCtx) return;
+      fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+
+      particles = particles.filter((p) => p.alpha > 0.02);
+      particles.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.07;
+        p.alpha -= 0.018;
+
+        fwCtx.save();
+        fwCtx.globalAlpha = Math.max(0, p.alpha);
+        fwCtx.beginPath();
+        fwCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        fwCtx.fillStyle = p.color;
+        fwCtx.fill();
+        fwCtx.restore();
+      });
+
+      if (particles.length > 0) {
+        fwAnimId = requestAnimationFrame(animateFireworks);
+      } else {
+        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+        fwAnimId = null;
+      }
+    }
+
+    const wheelSegments = [
+      { slot: "cap", label: "Item 1 (Cap)", color: "#3b82f6", img: "/static/360_F_327382858_chTKyqFvPB4U0c1zi0OjYHT7dqp8zieR.jpg" },
+      { slot: "top", label: "Item 2 (Top)", color: "#10b981", img: "/static/cartoon-clothes-male-blue-t-shirt-vector.jpg" },
+      { slot: "bottom", label: "Item 6 (Bottom)", color: "#f59e0b", img: "/static/istockphoto-1076492576-612x612.jpg" },
+      { slot: "shoes", label: "Item 8 (Shoes)", color: "#ec4899", img: "/static/vector-cartoon-yellow-sneakers-smart-260nw-2285618295.webp" },
+    ];
+
+    function drawWheel(rotationRad = 0) {
+      const canvas = document.getElementById("wheelCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const r = cx - 8;
+      const arc = (Math.PI * 2) / wheelSegments.length;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      wheelSegments.forEach((seg, idx) => {
+        const start = rotationRad + idx * arc;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, start, start + arc);
+        ctx.closePath();
+        ctx.fillStyle = seg.color;
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(start + arc / 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 12px Segoe UI, sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(seg.label, r - 10, 4);
+        ctx.restore();
+      });
+    }
+
+    let currentWheelAngle = 0;
+    let isSpinningWheel = false;
+    const spinWheelBtn = document.getElementById("spinWheelBtn");
+    const wheelResultText = document.getElementById("wheelResultText");
+
+    spinWheelBtn.addEventListener("click", () => {
+      if (isSpinningWheel) return;
+      if (appState.points < UNLOCK_POINTS || appState.wheelSpunThisCycle) return;
+
+      isSpinningWheel = true;
+      spinWheelBtn.disabled = true;
+
+      const pickedIdx = Math.floor(Math.random() * wheelSegments.length);
+      const picked = wheelSegments[pickedIdx];
+      const arc = (Math.PI * 2) / wheelSegments.length;
+
+      const segmentCenterLocal = pickedIdx * arc + arc / 2;
+      const pointerAngle = Math.PI * 1.5;
+      const desiredMod = (((pointerAngle - segmentCenterLocal) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const currentMod = (((currentWheelAngle) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      let deltaToTarget = desiredMod - currentMod;
+      if (deltaToTarget < 0) deltaToTarget += Math.PI * 2;
+
+      const startAngle = currentWheelAngle;
+      const targetAngle = startAngle + Math.PI * 10 + deltaToTarget;
+      const duration = 2400;
+      const t0 = performance.now();
+
+      function stepSpin(now) {
+        const elapsed = now - t0;
+        const progress = Math.min(1, elapsed / duration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        currentWheelAngle = startAngle + (targetAngle - startAngle) * eased;
+        drawWheel(currentWheelAngle);
+
+        if (progress < 1) {
+          requestAnimationFrame(stepSpin);
+        } else {
+          currentWheelAngle = targetAngle % (Math.PI * 2);
+          drawWheel(currentWheelAngle);
+
+          if (picked.img) {
+            appState.equipped[picked.slot] = picked.img;
+          }
+
+          appState.wheelSpunThisCycle = true;
+          appState.points = 0;
+          appState.clothesDisabledAfterSpin = true;
+          isSpinningWheel = false;
+
+          wheelResultText.textContent = `Won: ${picked.label} • Points : 0`;
+          launchFireworks();
+          saveState();
+        }
+      }
+
+      requestAnimationFrame(stepSpin);
+    });
+
+    function renderPointsAndWheel() {
+      document.getElementById("mainPointValue").textContent = appState.points;
+      document.getElementById("modalPointValue").textContent = appState.points;
+
+      const wheelSection = document.getElementById("wheelSection");
+      const wheelLockedNote = document.getElementById("wheelLockedNote");
+      const canShowWheel = appState.points >= UNLOCK_POINTS || appState.wheelSpunThisCycle;
+
+      if (canShowWheel) {
+        wheelSection.classList.remove("hidden");
+        wheelLockedNote.classList.add("hidden");
+        spinWheelBtn.disabled = Boolean(appState.wheelSpunThisCycle || isSpinningWheel || appState.points < UNLOCK_POINTS);
+        drawWheel(currentWheelAngle);
+      } else {
+        wheelSection.classList.add("hidden");
+        wheelLockedNote.classList.remove("hidden");
+      }
+    }
+
+    function renderEquippedClothes() {
+      const slotMap = {
+        cap: document.getElementById("equippedCapImg"),
+        top: document.getElementById("equippedTopImg"),
+        bottom: document.getElementById("equippedBottomImg"),
+        shoes: document.getElementById("equippedShoesImg"),
+      };
+
+      const activeNames = [];
+      Object.entries(slotMap).forEach(([slot, imgEl]) => {
+        const src = (appState.equipped[slot] || "").trim();
+        if (src) {
+          imgEl.src = src;
+          imgEl.classList.remove("hidden");
+          activeNames.push(slot);
+        } else {
+          imgEl.src = "";
+          imgEl.classList.add("hidden");
+        }
+      });
+
+      document.getElementById("equippedSummary").textContent =
+        activeNames.length > 0 ? `Is wearing: ${activeNames.join(", ")}` : "Is wearing: Item not chosen.";
+    }
+
+    document.querySelectorAll(".item-card").forEach((card) => {
+      const imgEl = card.querySelector(".item-thumb");
+      const presetSrc = (card.dataset.img || "").trim();
+      if (presetSrc && imgEl) {
+        imgEl.src = presetSrc;
+      }
+
+      card.addEventListener("click", () => {
+        if (appState.points < UNLOCK_POINTS || appState.clothesDisabledAfterSpin) {
+          return;
+        }
+        const slot = card.dataset.slot;
+        const chosenSrc = (card.dataset.img || (imgEl ? imgEl.getAttribute("src") : "") || "").trim();
+        if (!chosenSrc) {
+          alert(`Missing image link for "${card.dataset.label}".`);
+          return;
+        }
+        appState.equipped[slot] = appState.equipped[slot] === chosenSrc ? "" : chosenSrc;
+        saveState();
+      });
+    });
+
+    const baseCharImg = document.getElementById("baseCharacterImg");
+    const fallbackSvg = document.getElementById("fallbackCharacterSvg");
+    if ((baseCharImg.getAttribute("src") || "").trim()) {
+      baseCharImg.style.display = "block";
+      fallbackSvg.style.display = "none";
+    }
+
+    document.getElementById("resetDemoBtn").addEventListener("click", () => {
+      appState = structuredClone(defaultState);
+      wheelResultText.textContent = "";
+      saveState();
+      cheatFeedback.textContent = "";
+    });
+
+    updateWestLafayetteClock();
+    setInterval(updateWestLafayetteClock, 1000);
+    renderWeekCalendar();
+    renderPointsAndWheel();
+    renderSelectedCheatList();
+    renderEquippedClothes();
+    renderItemLocks();
+    renderRecommendedHealthyList();
+    updateSwapLabelAndSummary();
+    syncCheatCheckboxLock();
+    syncSwapCheckboxLock();
+  </script>
+</body>
+</html>
